@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rain.ai</title>
+<link rel="preconnect" href="https://huggingface.co" crossorigin>
+<link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%230a0a0d%22/%3E%3Cpath d=%22M32 8l7 14 15 2-11 11 3 15-14-7-14 7 3-15L10 24l15-2z%22 fill=%22%23ff2e88%22/%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%226%22 fill=%22%23fff%22/%3E%3C/svg%3E">
+<style>
+:root{
+  --pink:#ff2e88; --pink-dim:#b5145c; --pink-glow:#ff6fb0;
+  --bg:#0a0a0d; --panel:#121014; --bot:#18151a; --text:#f5eef1; --muted:#8f8690;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);display:flex;flex-direction:column;
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body.embed header{display:none}
+body.headless{display:none}
+#rainBg{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+header,#progress,#chat,footer{position:relative;z-index:1}
+
+header{padding:14px 16px;background:linear-gradient(135deg,#000,#1a0512 60%,var(--pink-dim));
+  border-bottom:1px solid rgba(255,46,136,.35);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+h1{font-size:17px;margin:0;letter-spacing:1px;text-shadow:0 0 14px rgba(255,46,136,.7)}
+.sub{font-size:11px;color:var(--pink-glow);margin-top:2px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.status{font-size:12px;background:rgba(255,46,136,.15);border:1px solid rgba(255,46,136,.4);padding:5px 10px;border-radius:999px}
+.pill{background:none;border:1px solid rgba(255,46,136,.4);color:var(--pink-glow);border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit}
+.pill:hover{background:rgba(255,46,136,.12)}
+select.pill{-webkit-appearance:none;appearance:none}
+select.pill option{background:#121014;color:#fff}
+select.pill optgroup{background:#121014;color:var(--pink-glow);font-style:normal}
+#tier{max-width:230px;text-overflow:ellipsis}
+
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+.overlay.open{display:flex}
+.panel{background:var(--panel);border:1px solid rgba(255,46,136,.35);border-radius:12px;padding:16px;width:100%;max-width:480px}
+.panel h2{margin:0 0 10px;font-size:15px}
+.panel label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.panel textarea{width:100%;display:block;min-height:110px;background:#000;color:var(--text);border:1px solid rgba(255,46,136,.3);border-radius:8px;padding:8px;font-size:13px;resize:vertical;font-family:inherit}
+.panel .row{justify-content:flex-end;margin-top:14px}
+.panel{max-height:92vh;overflow-y:auto}
+.gen{display:flex;gap:6px;margin-bottom:8px}
+.panel input{flex:1;min-width:0;padding:8px 12px;border-radius:999px;border:1px solid rgba(255,46,136,.3);background:#000;color:var(--text);font-size:13px;font-family:inherit}
+.panel input:focus{outline:none;border-color:var(--pink)}
+.panel .chips{margin:0 0 14px}
+
+#progress{padding:10px 16px;font-size:12px;color:var(--muted)}
+#bar{height:6px;background:rgba(255,46,136,.15);border-radius:4px;overflow:hidden;margin-top:6px}
+#fill{height:100%;width:0;background:linear-gradient(90deg,var(--pink-dim),var(--pink));transition:width .2s}
+
+#chat{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.msg{max-width:min(82%,720px);padding:11px 14px;border-radius:14px;font-size:14px;line-height:1.55;animation:pop .18s ease-out;word-wrap:break-word}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}}
+.msg.bot{background:rgba(24,21,26,.92);border:1px solid rgba(255,46,136,.15);align-self:flex-start;border-top-left-radius:4px}
+.msg.user{background:linear-gradient(135deg,var(--pink),var(--pink-dim));color:#fff;align-self:flex-end;border-top-right-radius:4px;white-space:pre-wrap}
+.msg p{margin:0 0 8px}.msg p:last-child{margin:0}
+.msg h1,.msg h2,.msg h3{margin:10px 0 6px;font-size:15px;color:var(--pink-glow);text-shadow:none;letter-spacing:0}
+.msg ul,.msg ol{margin:0 0 8px;padding-left:20px}
+.code{margin:8px 0;border:1px solid rgba(255,46,136,.25);border-radius:8px;overflow:hidden}
+.codeHead{display:flex;justify-content:space-between;align-items:center;background:#1a0e14;padding:4px 8px;font-size:11px;color:var(--muted)}
+.codeHead div{display:flex;gap:6px}
+.codeHead button{padding:3px 10px;font-size:11px;border-radius:999px;background:var(--pink-dim);color:#fff;border:none;cursor:pointer}
+.msg pre{background:#000;padding:10px 12px;overflow-x:auto;margin:0}
+.msg code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.msg :not(pre)>code{background:rgba(255,46,136,.15);padding:1px 5px;border-radius:4px}
+.typing{display:inline-flex;gap:4px}
+.typing span{width:6px;height:6px;border-radius:50%;background:var(--pink-glow);animation:blink 1.2s infinite ease-in-out}
+.typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
+footer{padding:10px 12px;background:rgba(18,16,20,.95);border-top:1px solid rgba(255,46,136,.2);display:flex;gap:8px;align-items:flex-end}
+textarea#in{flex:1;min-width:0;padding:11px 14px;border-radius:20px;border:1px solid rgba(255,46,136,.3);background:#000;color:var(--text);font-size:14px;font-family:inherit;resize:none;max-height:140px;line-height:1.4}
+textarea#in:focus{outline:none;border-color:var(--pink)}
+.send{padding:0 20px;height:42px;border:none;border-radius:999px;background:linear-gradient(135deg,var(--pink),var(--pink-dim));color:#fff;font-weight:600;font-size:14px;cursor:pointer}
+.send.stop{background:#2a1a22;border:1px solid var(--pink)}
+button:disabled,textarea:disabled{opacity:.4;cursor:not-allowed}
+.voiceBtn{width:42px;height:42px;padding:0;border:1px solid rgba(255,46,136,.4);border-radius:50%;background:#160b11;color:var(--pink-glow);font-size:18px;cursor:pointer}
+.voiceBtn:hover{background:rgba(255,46,136,.14)}
+.voiceBtn.active{background:var(--pink);color:#fff;box-shadow:0 0 18px rgba(255,46,136,.45)}
+</style>
+</head>
+<body>
+<canvas id="rainBg"></canvas>
+
+<header>
+  <div>
+    <h1>RAIN.AI</h1>
+    <div class="sub">Local AI · runs on your device, no server</div>
+  </div>
+  <div class="row">
+    <select class="pill" id="tier" title="Choose a model"></select>
+    <button class="pill" id="embedBtn">Embed</button>
+    <button class="pill" id="settingsBtn">Settings</button>
+    <button class="pill" id="clearBtn">Clear chat</button>
+    <div class="status" id="status">Starting…</div>
+  </div>
+</header>
+
+<div id="overlay" class="overlay"><div class="panel">
+  <h2>Settings</h2>
+  <label for="genBox">Generate a system prompt with AI</label>
+  <div class="gen">
+    <input id="genBox" placeholder="e.g. a sarcastic pirate who helps with JavaScript">
+    <button class="pill" id="genBtn">Generate</button>
+  </div>
+  <div class="chips" id="templates"></div>
+  <label for="promptBox">System prompt (personality &amp; rules)</label>
+  <textarea id="promptBox"></textarea>
+  <div class="row">
+    <button class="pill" id="resetPromptBtn">Reset to default</button>
+    <button class="pill" id="cancelBtn">Cancel</button>
+    <button class="pill" id="saveBtn">Save &amp; apply</button>
+  </div>
+</div></div>
+
+<div id="embedOverlay" class="overlay"><div class="panel">
+  <h2>Use Rain in another project</h2>
+  <p style="font-size:12px;color:var(--muted);margin:0 0 10px">Copy the AI prompt and paste it into ChatGPT, Claude, Cursor, etc. along with your project. It contains everything needed to wire Rain in.</p>
+  <textarea id="embedBox" readonly style="min-height:200px"></textarea>
+  <div class="row">
+    <button class="pill" id="embedClose">Close</button>
+    <button class="pill" id="embedCopySnippet">Copy snippet only</button>
+    <button class="pill" id="embedCopyAI">Copy AI prompt</button>
+  </div>
+</div></div>
+
+<div id="progress"><span id="progressText">Preparing model…</span><div id="bar"><div id="fill"></div></div></div>
+<div id="chat"></div>
+<footer>
+  <textarea id="in" rows="1" placeholder="Ask me anything…" disabled></textarea>
+  <button class="voiceBtn" id="micBtn" title="Talk to Rain" aria-label="Talk to Rain" disabled>🎙️</button>
+  <button class="voiceBtn active" id="speakBtn" title="Read replies aloud" aria-label="Read replies aloud">🔊</button>
+  <button class="send" id="send" disabled>Send</button>
+</footer>
+
+<script type="module">
+// The library is loaded at boot from the first CDN below that works.
+// esm.sh is last: it injects a fake Node `process`, which makes the model loader
+// look for Node's createRequire and crash in the browser.
+const LIBS = [
+  "https://unpkg.com/@mlc-ai/web-llm?module",
+  "https://cdn.skypack.dev/@mlc-ai/web-llm",
+  "https://esm.sh/@mlc-ai/web-llm"
+];
+
+/* =============================================================================
+   RAIN.AI — local AI in the browser (WebGPU). ONE FILE. No server, no API key.
+   Three models: turbo (~0.4GB) / fast (~0.9GB) / smart (~2.2GB).
+
+   ── FOR AI ASSISTANTS: HOW TO USE THIS IN ANOTHER PROJECT ────────────────────
+   This file is both a chat app and an embeddable engine. To add autofill /
+   autocomplete / text generation to any web page:
+
+   1. Host this file anywhere (or keep it next to the project).
+   2. Open it, click "Embed", and paste the generated <script> snippet into the
+      target page. (Or write it yourself: a hidden <iframe src="THIS_FILE?headless=1">
+      and talk to it with postMessage — the snippet does exactly that.)
+   3. Then in the page:
+
+        await Rain.ready;                                    // model loaded
+        Rain.onProgress((p, text) => ...);                   // optional, p = 0..1
+        await Rain.autofill({ label, context, partial });    // -> string, one field
+        await Rain.fill({ Name:'', Bio:'' }, 'context');     // -> { Name, Bio }
+        await Rain.ask(prompt, { system, json, maxTokens, temperature });  // -> string
+        Rain.attach(inputEl, { label, context });            // live suggestion, Tab accepts
+        await Rain.generatePrompt('a calm support agent');   // -> a ready-to-use system prompt
+        await Rain.models();                                 // -> [{ id, name, family, vramMB }]  every WebLLM chat model
+        await Rain.setModel(id);                             // switch model (id from Rain.models())
+
+   URL options (on this file): ?headless=1 no UI · ?embed=1 hide header ·
+   ?model=turbo|fast|smart|<any WebLLM model id> · ?prompt=... system prompt · ?origins=a.com,b.com allowlist.
+   Requirements: Chrome/Edge with WebGPU. First load downloads the model once;
+   after that it is cached by the browser.
+   ============================================================================= */
+
+const DEFAULT_PROMPT = "You are Rain, a sharp, friendly, helpful assistant. Answer clearly and directly. Use short paragraphs. When you write code, always put it in a markdown code fence with a language tag, e.g. ```html ... ```.";
+const MODELS = {
+  turbo: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",  // ~0.4GB  fastest, weakest
+  fast:  "Llama-3.2-1B-Instruct-q4f16_1-MLC",  // ~0.9GB  balanced
+  smart: "Llama-3.2-3B-Instruct-q4f16_1-MLC"   // ~2.2GB  best, slowest
+};
+const EXT = { html:"html", javascript:"js", js:"js", python:"py", py:"py", css:"css", json:"json",
+  bash:"sh", sh:"sh", typescript:"ts", ts:"ts", jsx:"jsx", tsx:"tsx", java:"java", c:"c", cpp:"cpp", sql:"sql" };
+const SUGGESTIONS = ["Build me a landing page", "Explain this like I'm 5", "Write a Python script to rename files"];
+
+/* ---------- state ---------- */
+const $ = id => document.getElementById(id);
+const store = { get:k=>{try{return localStorage.getItem(k)}catch{return null}}, set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}} };
+const qs = new URLSearchParams(location.search);
+const ALLOWED = (qs.get('origins') || '').split(',').map(s => s.trim()).filter(Boolean);
+
+if (qs.get('headless') === '1') document.body.classList.add('headless', 'embed');
+if (qs.get('embed') === '1') document.body.classList.add('embed');
+
+const HEADLESS = document.body.classList.contains('headless');
+const PRESETS = { turbo:'Turbo', fast:'Fast', smart:'Smart' };
+const PRESET_NAMES = { turbo:'Qwen2.5 0.5B', fast:'Llama 3.2 1B', smart:'Llama 3.2 3B' };
+const resolve = x => MODELS[x] || x || null;           // 'fast' -> model id; a full model id passes through
+const presetOf = id => Object.keys(MODELS).find(k => MODELS[k] === id);
+let modelId = resolve(qs.get('model') || qs.get('tier')) || resolve(store.get('rain_model')) || MODELS.fast;
+let models = [];                                        // every chat model WebLLM ships, filled once the library loads
+let systemPrompt = qs.get('prompt') || store.get('rain_prompt') || DEFAULT_PROMPT;
+let history = [], engine = null, busy = false;
+let voiceEnabled = true, recognition = null, listening = false;
+const speech = window.speechSynthesis || null;
+let queue = Promise.resolve();            // serializes model use so calls never collide
+const latest = {};                         // key -> newest request id (drops stale autocomplete calls)
+let markReady, failReady, ready;
+const arm = () => { ready = new Promise((ok, no) => { markReady = ok; failReady = no; }); ready.catch(() => {}); };
+arm();
+
+/* ---------- rendering ---------- */
+const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const inline = s => esc(s)
+  .replace(/`([^`]+)`/g, '<code>$1</code>')
+  .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+
+function download(name, text){
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([text], {type:'text/plain'})), download: name });
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+}
+
+function textBlocks(box, text){
+  text.split(/\n{2,}/).map(s => s.trim()).filter(Boolean).forEach(block => {
+    const lines = block.split('\n');
+    let el;
+    if (/^#{1,3} /.test(block)) { el = document.createElement('h3'); el.innerHTML = inline(block.replace(/^#+ /, '')); }
+    else if (lines.every(l => /^\s*[-*•] /.test(l))) { el = document.createElement('ul'); el.innerHTML = lines.map(l => `<li>${inline(l.replace(/^\s*[-*•] /, ''))}</li>`).join(''); }
+    else if (lines.every(l => /^\s*\d+[.)] /.test(l))) { el = document.createElement('ol'); el.innerHTML = lines.map(l => `<li>${inline(l.replace(/^\s*\d+[.)] /, ''))}</li>`).join(''); }
+    else { el = document.createElement('p'); el.innerHTML = inline(block).replace(/\n/g, '<br>'); }
+    box.appendChild(el);
+  });
+}
+
+let fileN = 0;
+function render(text){
+  const box = document.createElement('div');
+  const re = /```(\w*)\n?([\s\S]*?)(```|$)/g;      // also renders a code block that's still streaming
+  let last = 0, m;
+  while ((m = re.exec(text)) && m[0]) {
+    textBlocks(box, text.slice(last, m.index)); last = re.lastIndex;
+    const lang = (m[1] || 'txt').toLowerCase(), ext = EXT[lang] || 'txt', code = m[2];
+    const block = document.createElement('div'); block.className = 'code';
+    block.innerHTML = `<div class="codeHead"><span>${esc(lang)}</span><div><button data-a="copy">Copy</button><button data-a="dl">Download .${ext}</button></div></div><pre><code></code></pre>`;
+    block.querySelector('code').textContent = code;
+    block.querySelector('[data-a=copy]').onclick = e => { navigator.clipboard?.writeText(code); e.target.textContent = 'Copied'; setTimeout(() => e.target.textContent = 'Copy', 1200); };
+    block.querySelector('[data-a=dl]').onclick = () => download(`rain-${++fileN}.${ext}`, code);
+    box.appendChild(block);
+  }
+  textBlocks(box, text.slice(last));
+  return box;
+}
+
+function bubble(role, text){
+  const b = document.createElement('div'); b.className = 'msg ' + role;
+  if (text) role === 'bot' ? b.appendChild(render(text)) : b.textContent = text;
+  $('chat').appendChild(b); $('chat').scrollTop = 1e9; return b;
+}
+const typing = () => { const b = bubble('bot'); b.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>'; return b; };
+
+function welcome(text){
+  const b = bubble('bot', text);
+  const chips = document.createElement('div'); chips.className = 'chips';
+  SUGGESTIONS.forEach(s => { const c = document.createElement('button'); c.className = 'pill'; c.textContent = s; c.onclick = () => { chips.remove(); send(s); }; chips.appendChild(c); });
+  b.appendChild(chips);
+}
+
+/* ---------- models ---------- */
+// Turns a WebLLM model record into a friendly entry: "Llama-3.2-1B-Instruct-q4f16_1-MLC" -> "Llama 3.2 1B Instruct"
+function describe(m){
+  const id = m.model_id;
+  const mt = id.match(/^(.*?)-(q\d+f\d+(?:_\d+)?)-MLC(?:-(.+))?$/);
+  const raw = (mt ? mt[1] : id.replace(/-MLC$/, '')).replace(/-/g, ' ');
+  const fam = (raw.match(/^[A-Za-z]+/) || ['Other'])[0];
+  return { id, name: raw.charAt(0).toUpperCase() + raw.slice(1), family: fam.charAt(0).toUpperCase() + fam.slice(1),
+           quant: mt ? mt[2] : '', ctx: mt?.[3] || '', vramMB: Math.round(m.vram_required_MB || 0) };
+}
+const gb = mb => mb ? (mb / 1024).toFixed(1) + ' GB' : '';
+const labelOf = m => [m.name + (m.ctx ? ` (${m.ctx})` : ''), m.quant, gb(m.vramMB)].filter(Boolean).join(' · ');
+const nameOf = id => (models.find(m => m.id === id) || {}).name || id;
+
+function renderModelSelect(){
+  const sel = $('tier'); sel.innerHTML = '';
+  const group = (title, items) => {
+    const g = document.createElement('optgroup'); g.label = title;
+    items.forEach(([v, t]) => g.appendChild(new Option(t, v)));
+    sel.appendChild(g);
+  };
+  const have = new Set(models.map(m => m.id));
+  group('Quick picks', Object.keys(MODELS).filter(k => !models.length || have.has(MODELS[k])).map(k => {
+    const m = models.find(x => x.id === MODELS[k]);
+    return [MODELS[k], `${PRESETS[k]} — ${m ? labelOf(m) : PRESET_NAMES[k]}`];
+  }));
+  const quick = new Set(Object.values(MODELS)), fams = {};
+  models.filter(m => !quick.has(m.id)).forEach(m => (fams[m.family] ||= []).push(m));
+  Object.keys(fams).sort().forEach(f => group(f, fams[f].sort((a, b) => a.vramMB - b.vramMB).map(m => [m.id, labelOf(m)])));
+  if (![...sel.options].some(o => o.value === modelId)) group('Custom', [[modelId, modelId]]);
+  sel.value = modelId;
+}
+
+function loadModelList(mod){
+  if (models.length) return;
+  const list = mod.prebuiltAppConfig?.model_list || [];
+  // model_type: 0/undefined = chat LLM, 1 = embedding, 2 = vision — Rain is a text chat, so LLMs only
+  models = list.filter(m => [undefined, 0, 'LLM'].includes(m.model_type)).map(describe);
+  renderModelSelect();
+}
+
+/* ---------- engine ---------- */
+const loaded = {}; let workingUrl = null;
+async function createEngine(id, onProgress){
+  let lastErr;
+  for (const url of workingUrl ? [workingUrl] : LIBS) {
+    try {
+      const mod = loaded[url] ||= await import(url);
+      loadModelList(mod);
+      // Prefer OPFS for large model artifacts: it avoids repeatedly rebuilding
+      // huge model blobs from the normal Cache API on browsers that support it.
+      // Fall back to WebLLM's normal cache automatically if OPFS fails.
+      let e;
+      try {
+        const appConfig = mod.prebuiltAppConfig
+          ? { ...mod.prebuiltAppConfig, cacheBackend: 'opfs', opfsAccessMode: 'auto' }
+          : undefined;
+        e = await mod.CreateMLCEngine(id, { initProgressCallback:onProgress, ...(appConfig ? { appConfig } : {}) });
+      } catch (opfsErr) {
+        console.warn('Rain: OPFS cache unavailable, falling back to default cache', opfsErr);
+        e = await mod.CreateMLCEngine(id, { initProgressCallback:onProgress });
+      }
+      workingUrl = url; return e;
+    } catch (err) { lastErr = err; console.warn('Rain: failed with', url, err); }
+  }
+  throw lastErr;
+}
+
+const setStatus = () => { if (engine) $('status').textContent = `${navigator.onLine ? 'Online' : 'Offline'} · ${nameOf(modelId)} ready`; };
+addEventListener('online', setStatus); addEventListener('offline', setStatus);
+
+async function boot(id){
+  arm();
+  $('in').disabled = $('send').disabled = true;
+  $('progress').style.display = 'block'; $('fill').style.width = '0%';
+  $('progressText').textContent = 'Checking local model cache…';
+  $('status').textContent = 'Loading…';
+
+  if (!navigator.gpu) {
+    $('status').textContent = 'WebGPU unavailable';
+    $('progressText').textContent = "This browser doesn't support WebGPU. Use the latest Chrome or Edge.";
+    failReady(new Error('WebGPU unavailable')); post({ type:'rain:error', error:'WebGPU unavailable' });
+    return;
+  }
+  try {
+    await queue.catch(() => {});
+    if (busy) engine?.interruptGenerate?.();
+    if (engine?.unload) await engine.unload();
+    engine = null;
+    if (models.length && !models.some(m => m.id === id)) throw new Error(`"${id}" isn't in WebLLM's model list.`);
+    const onProgress = p => {
+      $('progressText').textContent = p.text || 'Loading…';
+      $('fill').style.width = Math.round((p.progress || 0) * 100) + '%';
+      post({ type:'rain:progress', progress:p.progress || 0, text:p.text || '' });
+    };
+    engine = await createEngine(id, onProgress);
+    modelId = id; if (!HEADLESS) store.set('rain_model', id);
+    if ($('tier').value !== id) renderModelSelect();
+    setStatus();
+    $('progress').style.display = 'none';
+    $('in').disabled = $('send').disabled = false;
+    markReady(); setupVoice(); setBusy(false); post({ type:'rain:ready', model:id, name:nameOf(id) });
+  } catch (e) {
+    $('status').textContent = 'Load failed';
+    $('progressText').textContent = "Couldn't load the model: " + e.message;
+    failReady(e); post({ type:'rain:error', error:e.message });
+  }
+}
+const switchModel = id => boot(id);
+
+/* ---------- chat (with memory) ---------- */
+function setBusy(on){
+  busy = on;
+  $('send').textContent = on ? 'Stop' : 'Send';
+  $('send').classList.toggle('stop', on);
+  $('send').disabled = !engine;
+  $('micBtn').disabled = !engine || !recognition;
+}
+
+async function send(text){
+  if (!text || !engine || busy) return;
+  await queue;                                   // wait for any autofill job to finish
+  setBusy(true);
+  bubble('user', text);
+  history.push({ role:'user', content:text });
+  history = history.slice(-18);                  // keep context short for small models
+
+  const b = typing(); let reply = '', t0 = 0;
+  try {
+    const stream = await engine.chat.completions.create({
+      messages: [{ role:'system', content:systemPrompt }, ...history], stream:true, temperature:0.6 });
+    for await (const c of stream) {
+      reply += c.choices[0]?.delta?.content || '';
+      const now = performance.now();
+      if (now - t0 > 80) { b.replaceChildren(render(reply)); $('chat').scrollTop = 1e9; t0 = now; }
+    }
+  } catch (e) { if (!reply) reply = 'Error: ' + e.message; }
+  b.replaceChildren(render(reply || '(stopped)'));
+  if (reply) history.push({ role:'assistant', content:reply });
+  post({ type:'rain:reply', text:reply });
+  setBusy(false); if (reply && voiceEnabled) speak(reply); $('in').focus();
+}
+
+/* ---------- embeddable API (headless: no UI, no chat history) ----------
+   ask(prompt, { system, temperature, maxTokens, json, key })
+   - json:true  -> model is forced to return valid JSON
+   - key        -> if a newer call with the same key arrives first, this one returns null (great for autocomplete) */
+function ask(prompt, o = {}){
+  const id = Symbol(); if (o.key) latest[o.key] = id;
+  const job = queue.then(async () => {
+    await ready;
+    if (o.key && latest[o.key] !== id) return null;
+    const r = await engine.chat.completions.create({
+      messages: [{ role:'system', content: o.system || systemPrompt }, { role:'user', content:String(prompt) }],
+      temperature: o.temperature ?? 0.4,
+      max_tokens: o.maxTokens ?? 256,
+      ...(o.json ? { response_format:{ type:'json_object' } } : {})
+    });
+    return r.choices[0]?.message?.content?.trim() || '';
+  });
+  queue = job.catch(() => {});
+  return job;
+}
+
+const clean = s => s == null ? s : s.replace(/^```\w*\n?|```$/g, '').replace(/^["'“]|["'”]$/g, '').trim();
+
+// Autofill one field.  { label, context, partial, examples, maxTokens, key }
+async function autofill({ label = 'text', context = '', partial = '', examples = [], maxTokens = 80, key } = {}){
+  const prompt =
+    `Fill in the form field "${label}".\n` +
+    (context ? `Context: ${context}\n` : '') +
+    (examples.length ? `Style examples: ${examples.join(' | ')}\n` : '') +
+    (partial ? `The user already typed: "${partial}". Continue it — output the full completed value.\n` : '') +
+    `Reply with ONLY the field value. No quotes, no labels, no explanation.`;
+  return clean(await ask(prompt, { maxTokens, temperature:0.5, key,
+    system:'You are an autofill engine. You output only the raw value for a form field, nothing else.' }));
+}
+
+// Fill many fields in ONE model call:  fill({ Name:'', Bio:'' }, 'a pirate chef') -> { Name:'…', Bio:'…' }
+async function fill(fields, context = ''){
+  const labels = Object.keys(fields);
+  try {
+    const raw = await ask(`Context: ${context}\nReturn a JSON object with exactly these keys: ${labels.join(', ')}. Values are short strings.`,
+      { json:true, maxTokens:400, system:'You are an autofill engine. Output only valid JSON.' });
+    const obj = JSON.parse(raw);
+    if (labels.every(k => k in obj)) return obj;
+  } catch {}
+  const out = {};                                // fallback for small models: one field at a time
+  for (const l of labels) out[l] = await autofill({ label:l, context });
+  return out;
+}
+
+const META = "You write system prompts for AI assistants. Given a short description, write one clear, specific system prompt that starts with \"You are\". Cover the role, the tone, any rules or limits, and the output format. Keep it under 150 words. Output ONLY the system prompt text, with no title, no quotes and no explanation.";
+const generatePrompt = async desc => clean(await ask(`Description: ${desc}\nWrite the system prompt.`, { system:META, temperature:0.7, maxTokens:350 }));
+
+window.Rain = { ask, autofill, fill, send, generatePrompt, setModel: switchModel, clear: () => clearChat(),
+  setSystemPrompt: t => setPrompt(t, false),
+  get ready(){ return ready; }, get model(){ return modelId; }, get models(){ return models; } };
+
+/* ---------- the embeddable client (this function is what "Embed" copies) ---------- */
+function rainClient(SRC, TIER){
+  const frame = document.createElement('iframe');
+  frame.src = SRC + '?headless=1&model=' + encodeURIComponent(TIER);
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = 'position:fixed;width:1px;height:1px;border:0;opacity:0;pointer-events:none;bottom:0;left:0';
+  (document.body || document.documentElement).appendChild(frame);
+  const host = new URL(SRC, location.href).origin, target = host === 'null' ? '*' : host;
+  const pending = {}, progressCbs = [];
+  let isReady, failed;
+  const ready = new Promise((ok, no) => { isReady = ok; failed = no; }); ready.catch(() => {});
+
+  addEventListener('message', e => {
+    const d = e.data || {};
+    if (e.source !== frame.contentWindow) return;
+    if (d.type === 'rain:ready') isReady();
+    else if (d.type === 'rain:progress') progressCbs.forEach(f => f(d.progress, d.text));
+    else if (d.type === 'rain:error' && !d.id) failed(new Error(d.error));
+    else if (pending[d.id]) { d.type === 'rain:error' ? pending[d.id].no(new Error(d.error)) : pending[d.id].ok(d.text); delete pending[d.id]; }
+  });
+  frame.addEventListener('load', () => frame.contentWindow.postMessage({ type:'rain:ping' }, '*'));
+
+  const call = (type, payload) => ready.then(() => new Promise((ok, no) => {
+    const id = Math.random().toString(36).slice(2);
+    pending[id] = { ok, no };
+    frame.contentWindow.postMessage({ type, id, ...payload }, target);
+  }));
+
+  // Live suggestion chip under a field. Tab accepts, Esc dismisses. Returns a detach function.
+  function attach(el, opts = {}) {
+    const key = 'attach-' + Math.random().toString(36).slice(2);
+    let timer, suggestion = '';
+    const chip = document.createElement('div');
+    chip.style.cssText = 'position:absolute;z-index:99999;display:none;max-width:420px;padding:5px 10px;border-radius:999px;font:12px system-ui,sans-serif;background:#ff2e88;color:#fff;box-shadow:0 4px 16px rgba(255,46,136,.4);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    document.body.appendChild(chip);
+    const hide = () => { chip.style.display = 'none'; suggestion = ''; };
+    const accept = () => { if (!suggestion) return; el.value = suggestion; el.dispatchEvent(new Event('input', { bubbles:true })); hide(); };
+    el.addEventListener('input', () => {
+      clearTimeout(timer); hide();
+      timer = setTimeout(async () => {
+        const text = await call('rain:autofill', { ...opts, partial:el.value, key }).catch(() => null);
+        if (!text || text === el.value) return;          // null = replaced by a newer request
+        const r = el.getBoundingClientRect();
+        chip.textContent = 'Tab ↹  ' + text; suggestion = text;
+        chip.style.left = scrollX + r.left + 'px'; chip.style.top = scrollY + r.bottom + 6 + 'px'; chip.style.display = 'block';
+      }, opts.delay ?? 500);
+    });
+    el.addEventListener('keydown', e => { if (e.key === 'Tab' && suggestion) { e.preventDefault(); accept(); } else if (e.key === 'Escape') hide(); });
+    el.addEventListener('blur', () => setTimeout(hide, 150));
+    chip.addEventListener('mousedown', e => { e.preventDefault(); accept(); });
+    return () => { clearTimeout(timer); chip.remove(); };
+  }
+
+  window.Rain = {
+    ready, attach,
+    onProgress: f => progressCbs.push(f),
+    ask:      (prompt, o = {}) => call('rain:ask', { prompt, ...o }),
+    autofill: (o = {})         => call('rain:autofill', o),
+    fill:     (fields, context = '') => call('rain:fill', { fields, context }).then(JSON.parse),
+    send:     text => call('rain:send', { text }),
+    generatePrompt: description => call('rain:generatePrompt', { description }),
+    models:   () => call('rain:models').then(JSON.parse),
+    setModel: model => call('rain:setModel', { model }),
+    setSystemPrompt: text => call('rain:setPrompt', { text })
+  };
+}
+
+function embedSnippet(){
+  const src = location.protocol === 'blob:' || location.protocol === 'data:' ? 'rain-ai.html' : location.origin + location.pathname;
+  const src2 = location.protocol === 'file:' ? location.href.split(/[?#]/)[0] : src;
+  return '<script>\n(' + rainClient.toString() + ')(' + JSON.stringify(src2) + ', ' + JSON.stringify(presetOf(modelId) || modelId) + ');\n<' + '/script>';
+}
+
+function aiPrompt(){
+  return [
+`Add local, offline-capable AI autofill to this project using Rain.ai (runs in the browser via WebGPU — no API key, no server).`,
+``,
+`STEP 1 — paste this snippet into the page (before your own script):`,
+``,
+embedSnippet(),
+``,
+`STEP 2 — it defines a global \`Rain\`. All methods are async:`,
+`  await Rain.ready;                                         // resolves when the model is loaded (first load downloads it)`,
+`  Rain.onProgress((p, text) => {});                         // optional load progress, p is 0..1`,
+`  await Rain.autofill({ label, context, partial, examples }) // -> string value for ONE form field`,
+`  await Rain.fill({ Name:'', Bio:'' }, 'context')            // -> { Name:'…', Bio:'…' } (whole form, one call)`,
+`  await Rain.ask(prompt, { system, json, maxTokens, temperature }) // -> string (json:true forces valid JSON)`,
+`  Rain.attach(inputEl, { label, context })                  // live suggestion chip while typing; Tab accepts, Esc dismisses`,
+`  await Rain.generatePrompt('a friendly bike-shop support agent')  // -> a ready-to-use system prompt string`,
+`  await Rain.models()                                       // -> [{ id, name, family, vramMB }] every chat model WebLLM ships`,
+`  await Rain.setModel(id)                                   // switch model (smaller = faster, bigger = smarter)`,
+``,
+`RULES:`,
+`  - Always \`await Rain.ready\` before the first call, and show a loading state until then.`,
+`  - Wrap calls in try/catch. If the browser has no WebGPU (use Chrome/Edge) the promise rejects — fall back to manual input.`,
+`  - Small local models: keep prompts short and concrete, set maxTokens low (40–120 for fields).`,
+`  - The Rain.ai file itself must be hosted/served at the URL used in the snippet.`
+  ].join('\n');
+}
+
+function showEmbed(){
+  $('embedBox').value = aiPrompt();
+  $('embedOverlay').classList.add('open');
+}
+const copy = (text, btn) => { navigator.clipboard?.writeText(text); const o = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => btn.textContent = o, 1200); };
+$('embedBtn').onclick = showEmbed;
+$('embedClose').onclick = () => $('embedOverlay').classList.remove('open');
+$('embedCopyAI').onclick = e => copy(aiPrompt(), e.target);
+$('embedCopySnippet').onclick = e => copy(embedSnippet(), e.target);
+
+/* ---------- iframe messaging ---------- */
+function post(msg){ if (window.parent !== window) window.parent.postMessage(msg, '*'); }
+
+addEventListener('message', async ({ data, source, origin }) => {
+  if (!data || typeof data.type !== 'string' || !data.type.startsWith('rain:') || !source) return;
+  if (ALLOWED.length && !ALLOWED.includes(new URL(origin).host)) return;
+  const reply = m => source.postMessage({ id:data.id, ...m }, origin === 'null' ? '*' : origin);
+  try {
+    if (data.type === 'rain:ask')            reply({ type:'rain:result', text: await ask(data.prompt, data) });
+    else if (data.type === 'rain:autofill')  reply({ type:'rain:result', text: await autofill(data) });
+    else if (data.type === 'rain:fill')      reply({ type:'rain:result', text: JSON.stringify(await fill(data.fields, data.context)) });
+    else if (data.type === 'rain:send')      send(data.text);
+    else if (data.type === 'rain:setPrompt') setPrompt(data.text, false);
+    else if (data.type === 'rain:generatePrompt') reply({ type:'rain:result', text: await generatePrompt(data.description) });
+    else if (data.type === 'rain:models')    reply({ type:'rain:result', text: JSON.stringify(models) });
+    else if (data.type === 'rain:setModel')  { await switchModel(resolve(data.model)); reply({ type:'rain:result', text:'ok' }); }
+    else if (data.type === 'rain:ping')      { if (engine) reply({ type:'rain:ready', model:modelId }); }
+  } catch (e) { reply({ type:'rain:error', error:e.message }); }
+});
+
+/* ---------- settings + UI wiring ---------- */
+function setPrompt(text, persist){
+  systemPrompt = text || DEFAULT_PROMPT; history = [];
+  if (persist) store.set('rain_prompt', systemPrompt);
+}
+function clearChat(msg = "Fresh start. What's up?"){ history = []; $('chat').innerHTML = ''; welcome(msg); }
+
+$('settingsBtn').onclick = () => { $('promptBox').value = systemPrompt; $('overlay').classList.add('open'); };
+$('cancelBtn').onclick = () => $('overlay').classList.remove('open');
+$('resetPromptBtn').onclick = () => $('promptBox').value = DEFAULT_PROMPT;
+$('saveBtn').onclick = () => { setPrompt($('promptBox').value.trim(), true); $('overlay').classList.remove('open'); clearChat('System prompt updated. Fresh conversation started.'); };
+$('clearBtn').onclick = () => clearChat();
+$('tier').onchange = async e => {
+  const id = e.target.value, m = models.find(x => x.id === id);
+  if (m && m.vramMB > 4000 && !confirm(`${m.name} needs about ${gb(m.vramMB)} of GPU memory and a big download. Continue?`)) { e.target.value = modelId; return; }
+  $('chat').innerHTML = ''; history = [];
+  await switchModel(id);
+  if (engine) bubble('bot', `Switched to ${nameOf(modelId)}. Still running fully on your device.`);
+};
+
+/* system prompt generator: instant templates + "write one for me" using the loaded model */
+const TEMPLATES = {
+  'Coder': "You are an expert programmer. Give working, minimal code in fenced code blocks with a language tag, then a short explanation. If the request is ambiguous, ask one clarifying question. Never invent APIs or libraries.",
+  'Tutor': "You are a patient tutor. Explain ideas step by step in plain language with one simple example. Check understanding with a short question at the end. Never just give the answer to homework without teaching the method.",
+  'Writer': "You are a skilled writing assistant. Write clear, vivid, natural prose that matches the tone the user asks for. Avoid clichés and filler. Offer one alternative version only when asked.",
+  'Autofill engine': "You are an autofill engine. Output only the raw value for the requested form field: no quotes, labels or explanation. Match the tone and style of the context given.",
+  'JSON only': "You output only valid JSON that matches the structure the user asks for. No prose, no markdown fences, no comments."
+};
+Object.entries(TEMPLATES).forEach(([name, text]) => {
+  const b = document.createElement('button'); b.className = 'pill'; b.textContent = name;
+  b.onclick = () => $('promptBox').value = text; $('templates').appendChild(b);
+});
+$('genBtn').onclick = async () => {
+  const d = $('genBox').value.trim(), btn = $('genBtn');
+  if (!d) return $('genBox').focus();
+  if (busy) { btn.textContent = 'Wait for reply…'; setTimeout(() => btn.textContent = 'Generate', 1500); return; }
+  btn.disabled = true; btn.textContent = 'Writing…';
+  try { $('promptBox').value = await generatePrompt(d); }
+  catch (e) { $('promptBox').value = 'Could not generate a prompt: ' + e.message; }
+  btn.disabled = false; btn.textContent = 'Generate';
+};
+$('genBox').onkeydown = e => { if (e.key === 'Enter') $('genBtn').click(); };
+
+const input = $('in');
+const submit = () => { const t = input.value.trim(); input.value = ''; grow(); send(t); };
+const grow = () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 140) + 'px'; };
+$('send').onclick = () => busy ? engine.interruptGenerate() : submit();
+input.oninput = grow;
+input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!busy) submit(); } };
+
+/* ---------- voice: browser-native STT + TTS ---------- */
+function speak(text){
+  if (!speech || !voiceEnabled || !text) return;
+  speech.cancel();
+  const plain = text.replace(/```[\\s\\S]*?```/g,' code block ').replace(/[#*_`]/g,'').trim();
+  if (!plain) return;
+  const u = new SpeechSynthesisUtterance(plain);
+  u.rate = 1.02; u.pitch = 1.0; u.volume = 1;
+  speech.speak(u);
+}
+function setupVoice(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  $('speakBtn').disabled = !speech;
+  if (!SR) return;
+  recognition = new SR();
+  recognition.lang = navigator.language || 'en-US';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.onstart = () => {
+    listening = true; $('micBtn').classList.add('active'); $('micBtn').textContent = '⏹️';
+    $('status').textContent = 'Listening…';
+  };
+  recognition.onresult = e => {
+    let finalText = '';
+    for (let i=e.resultIndex; i<e.results.length; i++)
+      if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+    if (finalText.trim()) { input.value = finalText.trim(); grow(); submit(); }
+  };
+  recognition.onerror = e => { if (e.error !== 'aborted') console.warn('Rain STT:', e.error); stopListening(); };
+  recognition.onend = stopListening;
+  $('micBtn').disabled = !engine;
+}
+function stopListening(){
+  listening = false; $('micBtn').classList.remove('active'); $('micBtn').textContent = '🎙️';
+  if (engine) setStatus();
+}
+$('micBtn').onclick = () => {
+  if (!recognition) return;
+  if (listening) { recognition.stop(); return; }
+  speech?.cancel();
+  try { recognition.start(); } catch {}
+};
+$('speakBtn').onclick = () => {
+  voiceEnabled = !voiceEnabled;
+  $('speakBtn').classList.toggle('active', voiceEnabled);
+  $('speakBtn').textContent = voiceEnabled ? '🔊' : '🔇';
+  if (!voiceEnabled) speech?.cancel();
+};
+setupVoice();
+
+/* ---------- ambient rain (UI mode only) ---------- */
+(function rain(){
+  if (document.body.classList.contains('embed') || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cv = $('rainBg'), cx = cv.getContext('2d'); let w, h;
+  const fit = () => { w = cv.width = innerWidth; h = cv.height = innerHeight; }; fit(); addEventListener('resize', fit);
+  const drops = Array.from({ length:70 }, () => ({ x:Math.random()*w, y:Math.random()*h, l:8+Math.random()*16, v:2+Math.random()*3 }));
+  (function tick(){
+    if (!document.hidden) {
+      cx.clearRect(0, 0, w, h); cx.strokeStyle = 'rgba(255,46,136,.12)'; cx.lineWidth = 1; cx.beginPath();
+      for (const d of drops) { cx.moveTo(d.x, d.y); cx.lineTo(d.x - d.l*.15, d.y + d.l); d.y += d.v; if (d.y > h) { d.y = -d.l; d.x = Math.random()*w; } }
+      cx.stroke();
+    }
+    requestAnimationFrame(tick);
+  })();
+})();
+
+renderModelSelect();
+boot(modelId).then(() => engine && welcome("I'm running fully on your device — no server needed once loaded. Ask for code and I'll give you copy and download buttons. What's up?"));
+</script>
+</body>
+</html>
